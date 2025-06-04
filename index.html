@@ -188,8 +188,14 @@
       })
     });
 
+    if (!res.ok) {
+      const errorText = await res.text();
+      appendMessage('User', `[HTTP ${res.status}] ${res.statusText} — ${errorText}`);
+      throw new Error(`API Error: ${res.statusText}`);
+    }
+
     const data = await res.json();
-    return data.choices?.[0]?.message?.content?.trim() || "[No response]";
+    return data.choices?.[0]?.message?.content?.trim() || "[No response from model]";
   }
 
   async function simulateAIResponse(aiName, message) {
