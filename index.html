@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Multi-AI Chat Simulator (Mobile Friendly)</title>
+<style>
+  body {
+    font-family: monospace;
+    background: #111;
+    color: #eee;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  #chat {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+    background: #222;
+    word-wrap: break-word;
+  }
+  .message {
+    margin-bottom: 8px;
+    line-height: 1.3em;
+  }
+  .ai-name {
+    font-weight: bold;
+    color: #4caf50;
+  }
+  .user-name {
+    font-weight: bold;
+    color: #2196f3;
+  }
+  #input-area {
+    display: flex;
+    padding: 8px;
+    background: #111;
+    border-top: 1px solid #333;
+  }
+  #ai-select {
+    flex-shrink: 0;
+    font-size: 16px;
+    padding: 8px;
+    margin-right: 8px;
+    background: #333;
+    color: #eee;
+    border: none;
+    border-radius: 4px;
+    min-width: 100px;
+  }
+  #message-input {
+    flex: 1;
+    padding: 10px;
+    font-size: 16px;
+    border: none;
+    border-radius: 4px;
+    margin-right: 8px;
+    background: #444;
+    color: #eee;
+  }
+  #message-input::placeholder {
+    color: #bbb;
+  }
+  #send-btn {
+    padding: 10px 16px;
+    font-size: 16px;
+    border: none;
+    border-radius: 4px;
+    background: #4caf50;
+    color: white;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.3s ease;
+  }
+  #send-btn:hover {
+    background: #45a049;
+  }
+  /* Make sure chat doesn’t cause horizontal scroll on small screens */
+  @media (max-width: 480px) {
+    #ai-select {
+      min-width: 80px;
+      font-size: 14px;
+      padding: 6px;
+    }
+    #message-input {
+      font-size: 14px;
+      padding: 8px;
+      margin-right: 6px;
+    }
+    #send-btn {
+      font-size: 14px;
+      padding: 8px 12px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div id="chat"></div>
+
+<div id="input-area">
+  <select id="ai-select" aria-label="Select sender">
+    <option value="ChatGPT">ChatGPT</option>
+    <option value="Gemini">Gemini</option>
+    <option value="Claude">Claude</option>
+    <option value="User">User</option>
+  </select>
+  <input type="text" id="message-input" placeholder="Type message here..." aria-label="Message input" />
+  <button id="send-btn" aria-label="Send message">Send</button>
+</div>
+
+<script>
+  const chat = document.getElementById('chat');
+  const input = document.getElementById('message-input');
+  const sendBtn = document.getElementById('send-btn');
+  const aiSelect = document.getElementById('ai-select');
+
+  function appendMessage(sender, text) {
+    const msgDiv = document.createElement('div');
+    msgDiv.classList.add('message');
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = sender + ': ';
+    nameSpan.classList.add(sender === 'User' ? 'user-name' : 'ai-name');
+    msgDiv.appendChild(nameSpan);
+    msgDiv.appendChild(document.createTextNode(text));
+    chat.appendChild(msgDiv);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  function simulateAIResponse(aiName, message) {
+    setTimeout(() => {
+      appendMessage(aiName, `I received: "${message}"`);
+    }, 1000 + Math.random() * 2000);
+  }
+
+  sendBtn.onclick = () => {
+    const sender = aiSelect.value;
+    const message = input.value.trim();
+    if (!message) return;
+    appendMessage(sender, message);
+    input.value = '';
+    if (sender !== 'User') {
+      // AI bots sending — no auto reply for now
+    } else {
+      const bots = ['ChatGPT', 'Gemini', 'Claude'];
+      const bot = bots[Math.floor(Math.random() * bots.length)];
+      simulateAIResponse(bot, message);
+    }
+  };
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') sendBtn.click();
+  });
+
+  ['ChatGPT', 'Gemini', 'Claude'].forEach(bot => {
+    appendMessage(bot, `Ready to chat.`);
+  });
+</script>
+
+</body>
+</html>
