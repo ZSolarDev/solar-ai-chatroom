@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>Multi-AI Chat Simulator (Mobile Friendly)</title>
+  <title>Solar bot chatroom</title>
   <style>
     body {
       font-family: monospace;
@@ -13,20 +13,6 @@
       display: flex;
       flex-direction: column;
       height: 100vh;
-    }
-    #api-key-container {
-      padding: 10px;
-      background: #000;
-      border-bottom: 1px solid #333;
-    }
-    #api-key {
-      width: 100%;
-      padding: 8px;
-      font-size: 14px;
-      border-radius: 4px;
-      border: none;
-      background: #222;
-      color: #eee;
     }
     #chat {
       flex: 1;
@@ -111,45 +97,25 @@
 </head>
 <body>
 
-<div id="api-key-container">
-  <input id="api-key" type="password" placeholder="Enter OpenAI API Key (sk-...)" />
-</div>
-
 <div id="chat"></div>
 
 <div id="input-area">
   <select id="ai-select" aria-label="Select sender">
-    <option value="ChatGPT">ChatGPT</option>
-    <option value="Gemini">Gemini</option>
-    <option value="Claude">Claude</option>
     <option value="User">User</option>
+    <option value="ChatGPT">ChatGPT</option>
+    <option value="Claude">Claude</option>
+    <option value="Gemini">Gemini</option>
   </select>
   <input type="text" id="message-input" placeholder="Type message here..." aria-label="Message input" />
   <button id="send-btn" aria-label="Send message">Send</button>
 </div>
 
+<script src="https://js.puter.com/v2/"></script>
 <script>
-  let openaiApiKey = "";
-
   const chat = document.getElementById('chat');
   const input = document.getElementById('message-input');
   const sendBtn = document.getElementById('send-btn');
   const aiSelect = document.getElementById('ai-select');
-  const apiKeyInput = document.getElementById('api-key');
-
-  // Load key from localStorage
-  window.addEventListener('DOMContentLoaded', () => {
-    const savedKey = localStorage.getItem('openai_api_key');
-    if (savedKey) {
-      openaiApiKey = savedKey;
-      apiKeyInput.value = savedKey;
-    }
-  });
-
-  apiKeyInput.addEventListener('input', () => {
-    openaiApiKey = apiKeyInput.value.trim();
-    localStorage.setItem('openai_api_key', openaiApiKey);
-  });
 
   function appendMessage(sender, text) {
     const msgDiv = document.createElement('div');
@@ -163,49 +129,36 @@
     chat.scrollTop = chat.scrollHeight;
   }
 
-  async function fetchOpenAIResponse(prompt, persona) {
-    if (!openaiApiKey) throw new Error("API key not set!");
-
-    const systemPrompt = {
-      ChatGPT: "You are ChatGPT, a helpful assistant.",
-      Gemini: "You are Gemini, an imaginative AI who speaks in poetic ideas.",
-      Claude: "You are Claude, an insightful and thoughtful assistant."
-    }[persona];
-
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${openaiApiKey}`
-      },
-      body: JSON.stringify({
-        model: "gpt-3.5-turbo",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: prompt }
-        ],
-        temperature: 0.7
-      })
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`HTTP ${res.status}: ${errText}`);
+  async function fetchPuterResponse(message, aiName) {
+    let model;
+    switch(aiName) {
+      case 'Claude':
+        model = 'claude-sonnet-4';
+        break;
+      case 'Gemini':
+        model = 'google/gemini-2.0-flash-lite-001';
+        break;
+      case 'ChatGPT':
+      default:
+        model = 'gpt-4o';
+        break;
     }
 
-    const data = await res.json();
-    return data.choices?.[0]?.message?.content?.trim() || "[No response]";
-  }
-
-  async function simulateAIResponse(aiName, message) {
     appendMessage(aiName, "Typing...");
     const lastMsg = chat.lastElementChild;
 
     try {
-      const reply = await fetchOpenAIResponse(message, aiName);
-      lastMsg.textContent = `${aiName}: ${reply}`;
+      const response = await puter.ai.chat(message, { model });
+
+      if (aiName === 'Claude') {
+        lastMsg.textContent = `${aiName}: ${response.message.content?.[0]?.text || "[No response]"}`;
+      } else if (aiName === 'Gemini') {
+        lastMsg.textContent = `${aiName}: ${response.message.content || "[No response]"}`;
+      } else {
+        lastMsg.textContent = `${aiName}: ${response.message.content || "[No response]"}`;
+      }
     } catch (err) {
-      lastMsg.textContent = `${aiName}: [Error: ${err.message}]`;
+      lastMsg.textContent = `${aiName}: [Error: ${err.message || err}]`;
     }
   }
 
@@ -213,11 +166,12 @@
     const sender = aiSelect.value;
     const message = input.value.trim();
     if (!message) return;
+
     appendMessage(sender, message);
     input.value = '';
 
     if (sender === 'User') {
-      ['ChatGPT', 'Gemini', 'Claude'].forEach(bot => simulateAIResponse(bot, message));
+      ['ChatGPT', 'Claude', 'Gemini'].forEach(bot => fetchPuterResponse(message, bot));
     }
   };
 
@@ -225,8 +179,8 @@
     if (e.key === 'Enter') sendBtn.click();
   });
 
-  ['ChatGPT', 'Gemini', 'Claude'].forEach(bot => {
-    appendMessage(bot, `Ready to chat.`);
+  ['ChatGPT', 'Claude', 'Gemini'].forEach(bot => {
+    appendMessage(bot, 'Ready to chat.');
   });
 </script>
 
