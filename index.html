@@ -60,9 +60,9 @@
   const messages = [];
 
   const bots = [
-    { name: "ChatGPT", model: "gpt-4o", identity: "You are ChatGPT in a chatroom with Claude and Gemini." },
-    { name: "Claude", model: "anthropic/claude-3-sonnet", identity: "You are Claude in a chatroom with ChatGPT and Gemini." },
-    { name: "Gemini", model: "google/gemini-2.0-flash-lite-001", identity: "You are Gemini in a chatroom with ChatGPT and Claude." }
+    { name: "ChatGPT", model: "gpt-4o", identity: "You are ChatGPT in a chatroom with Claude and Gemini.", role: "assistant" },
+    { name: "Claude", model: "anthropic/claude-3-sonnet", identity: "You are Claude in a chatroom with ChatGPT and Gemini.", role: "assistant" },
+    { name: "Gemini", model: "google/gemini-2.0-flash-lite-001", identity: "You are Gemini in a chatroom with ChatGPT and Claude.", role: "assistant" }
   ];
 
   const chatBox = document.getElementById("messages");
@@ -89,7 +89,7 @@
 
   function tryBotRespond(bot) {
     const last = messages.slice(-3).map(m => m.role).join();
-    if (!last.includes(bot.name.toLowerCase())) {
+    if (!last.includes(bot.role)) {
       const systemPrompt = { role: "system", content: bot.identity };
       const convo = [systemPrompt, ...messages];
 
@@ -99,7 +99,7 @@
       puter.ai.chat(convo, { model: bot.model })
         .then(res => {
           const msg = res.message?.content || res;
-          messages.push({ role: bot.name.toLowerCase(), content: msg });
+          messages.push({ role: bot.role, content: msg });
           chatBox.children[typingIndex].textContent = `${bot.name}: ${msg}`;
         })
         .catch(err => {
@@ -115,7 +115,7 @@
 
   // Kickoff conversation
   bots.forEach(bot => {
-    messages.push({ role: bot.name.toLowerCase(), content: bot.identity });
+    messages.push({ role: "system", content: bot.identity });
   });
 
   bots.forEach(bot => tryBotRespond(bot));
