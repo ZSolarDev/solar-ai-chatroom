@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>Solar bot chatroom</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Multi-AI Group Chat</title>
   <style>
     body {
       font-family: monospace;
@@ -19,11 +19,9 @@
       overflow-y: auto;
       padding: 10px;
       background: #222;
-      word-wrap: break-word;
     }
     .message {
       margin-bottom: 8px;
-      line-height: 1.3em;
     }
     .ai-name {
       font-weight: bold;
@@ -39,29 +37,14 @@
       background: #111;
       border-top: 1px solid #333;
     }
-    #ai-select {
-      flex-shrink: 0;
-      font-size: 16px;
-      padding: 8px;
-      margin-right: 8px;
-      background: #333;
-      color: #eee;
-      border: none;
-      border-radius: 4px;
-      min-width: 100px;
-    }
     #message-input {
       flex: 1;
       padding: 10px;
       font-size: 16px;
       border: none;
       border-radius: 4px;
-      margin-right: 8px;
       background: #444;
       color: #eee;
-    }
-    #message-input::placeholder {
-      color: #bbb;
     }
     #send-btn {
       padding: 10px 16px;
@@ -71,27 +54,6 @@
       background: #4caf50;
       color: white;
       cursor: pointer;
-      flex-shrink: 0;
-      transition: background 0.3s ease;
-    }
-    #send-btn:hover {
-      background: #45a049;
-    }
-    @media (max-width: 480px) {
-      #ai-select {
-        min-width: 80px;
-        font-size: 14px;
-        padding: 6px;
-      }
-      #message-input {
-        font-size: 14px;
-        padding: 8px;
-        margin-right: 6px;
-      }
-      #send-btn {
-        font-size: 14px;
-        padding: 8px 12px;
-      }
     }
   </style>
 </head>
@@ -100,14 +62,8 @@
 <div id="chat"></div>
 
 <div id="input-area">
-  <select id="ai-select" aria-label="Select sender">
-    <option value="User">User</option>
-    <option value="ChatGPT">ChatGPT</option>
-    <option value="Claude">Claude</option>
-    <option value="Gemini">Gemini</option>
-  </select>
-  <input type="text" id="message-input" placeholder="Type message here..." aria-label="Message input" />
-  <button id="send-btn" aria-label="Send message">Send</button>
+  <input type="text" id="message-input" placeholder="Type message..." />
+  <button id="send-btn">Send</button>
 </div>
 
 <script src="https://js.puter.com/v2/"></script>
@@ -115,73 +71,101 @@
   const chat = document.getElementById('chat');
   const input = document.getElementById('message-input');
   const sendBtn = document.getElementById('send-btn');
-  const aiSelect = document.getElementById('ai-select');
+
+  const messages = [
+    {
+      role: "system",
+      content: "You are in a chat room with Claude, Gemini, and ChatGPT. You can talk to each other."
+    }
+  ];
+
+  const bots = ["ChatGPT", "Claude", "Gemini"];
+  const models = {
+    ChatGPT: "gpt-4o",
+    Claude: "claude-sonnet-4",
+    Gemini: "google/gemini-2.0-flash-lite-001"
+  };
+
+  const typingStatus = {};
 
   function appendMessage(sender, text) {
     const msgDiv = document.createElement('div');
     msgDiv.classList.add('message');
     const nameSpan = document.createElement('span');
-    nameSpan.textContent = sender + ': ';
-    nameSpan.classList.add(sender === 'User' ? 'user-name' : 'ai-name');
+    nameSpan.textContent = sender + ": ";
+    nameSpan.classList.add(sender === "User" ? "user-name" : "ai-name");
     msgDiv.appendChild(nameSpan);
     msgDiv.appendChild(document.createTextNode(text));
     chat.appendChild(msgDiv);
     chat.scrollTop = chat.scrollHeight;
+    return msgDiv;
   }
 
-  async function fetchPuterResponse(message, aiName) {
-    let model;
-    switch(aiName) {
-      case 'Claude':
-        model = 'claude-sonnet-4';
-        break;
-      case 'Gemini':
-        model = 'google/gemini-2.0-flash-lite-001';
-        break;
-      case 'ChatGPT':
-      default:
-        model = 'gpt-4o';
-        break;
-    }
-
-    appendMessage(aiName, "Typing...");
-    const lastMsg = chat.lastElementChild;
-
-    try {
-      const response = await puter.ai.chat(message, { model });
-
-      if (aiName === 'Claude') {
-        lastMsg.textContent = `${aiName}: ${response.message.content?.[0]?.text || "[No response]"}`;
-      } else if (aiName === 'Gemini') {
-        lastMsg.textContent = `${aiName}: ${response.message.content || "[No response]"}`;
-      } else {
-        lastMsg.textContent = `${aiName}: ${response.message.content || "[No response]"}`;
-      }
-    } catch (err) {
-      lastMsg.textContent = `${aiName}: [Error: ${err.message || err}]`;
-    }
+  function getLastRealMessages(n) {
+    return Array.from(chat.querySelectorAll('.message')).slice(-n).map(el => el.textContent);
   }
 
-  sendBtn.onclick = () => {
-    const sender = aiSelect.value;
+  function isBotTyping(name) {
+    return getLastRealMessages(3).some(msg => msg.includes(`${name}: Typing...`));
+  }
+
+  function isSomeoneTyping() {
+    return bots.some(isBotTyping);
+  }
+
+  function sendBotResponse(botName) {
+    if (isBotTyping(botName)) return;
+
+    const recentMessages = getLastRealMessages(3).join(" ");
+    if (recentMessages.includes(botName)) return; // already spoke recently
+    if (isSomeoneTyping()) return;
+
+    const model = models[botName];
+    const typing = appendMessage(botName, "Typing...");
+    typingStatus[botName] = typing;
+
+    puter.ai.chat(messages, { model })
+      .then(response => {
+        let content;
+        if (botName === 'Claude') {
+          content = response.message.content?.[0]?.text || "[No response]";
+        } else if (botName === 'Gemini') {
+          content = response.message.content || "[No response]";
+        } else {
+          content = response.message.content || "[No response]";
+        }
+
+        typing.textContent = `${botName}: ${content}`;
+        messages.push({ role: "assistant", name: botName, content });
+        checkAllBots(); // recursive turn taking
+      })
+      .catch(err => {
+        typing.textContent = `${botName}: [Error: ${err.message || err}]`;
+      });
+  }
+
+  function checkAllBots() {
+    bots.forEach(bot => sendBotResponse(bot));
+  }
+
+  function userSend() {
     const message = input.value.trim();
     if (!message) return;
 
-    appendMessage(sender, message);
+    appendMessage("User", message);
+    messages.push({ role: "user", content: message });
     input.value = '';
 
-    if (sender === 'User') {
-      ['ChatGPT', 'Claude', 'Gemini'].forEach(bot => fetchPuterResponse(message, bot));
-    }
-  };
+    checkAllBots();
+  }
 
+  sendBtn.onclick = userSend;
   input.addEventListener('keydown', e => {
-    if (e.key === 'Enter') sendBtn.click();
+    if (e.key === "Enter") userSend();
   });
 
-  ['ChatGPT', 'Claude', 'Gemini'].forEach(bot => {
-    appendMessage(bot, 'Ready to chat.');
-  });
+  // Kickstart chat
+  bots.forEach(bot => sendBotResponse(bot));
 </script>
 
 </body>
