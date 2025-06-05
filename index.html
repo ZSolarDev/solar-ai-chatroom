@@ -1,4 +1,5 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -53,71 +54,98 @@
     }
   </style>
 </head>
-<body><div id="messages"></div><div id="input-area">
-  <input type="text" id="input-message" placeholder="Type your message...">
-  <button id="send-btn">Send</button>
-</div><script>
-  const messages = [];
+<body>
+  <div id="messages"></div>
+  <div id="input-area">
+    <input type="text" id="input-message" placeholder="Type your message...">
+    <button id="send-btn">Send</button>
+  </div>
 
-  const bots = [
-    { name: "ChatGPT", model: "gpt-4o", identity: "You are ChatGPT in a chatroom with Claude and Gemini.", role: "assistant" },
-    { name: "Claude", model: "anthropic/claude-3-sonnet", identity: "You are Claude in a chatroom with ChatGPT and Gemini.", role: "assistant" },
-    { name: "Gemini", model: "google/gemini-2.0-flash-lite-001", identity: "You are Gemini in a chatroom with ChatGPT and Claude.", role: "assistant" }
-  ];
+  <script>
+    const messages = [];
 
-  const chatBox = document.getElementById("messages");
+    const bots = [
+      {
+        name: "ChatGPT",
+        model: "gpt-4o",
+        identity: "You are ChatGPT. You are in a chatroom with Claude and Gemini. Respond as ChatGPT.",
+        role: "assistant"
+      },
+      {
+        name: "Claude",
+        model: "anthropic/claude-3-sonnet",
+        identity: "You are Claude. You are in a chatroom with ChatGPT and Gemini. Respond as Claude.",
+        role: "assistant"
+      },
+      {
+        name: "Gemini",
+        model: "google/gemini-2.0-flash-lite-001",
+        identity: "You are Gemini. You are in a chatroom with ChatGPT and Claude. Respond as Gemini.",
+        role: "assistant"
+      }
+    ];
 
-  function addMessage(text, isUser) {
-    const div = document.createElement("div");
-    div.className = "message";
-    if (isUser) div.classList.add("user-message");
-    else div.classList.add("ai-message");
-    div.textContent = text;
-    chatBox.appendChild(div);
-    chatBox.scrollTop = chatBox.scrollHeight;
-  }
+    const chatBox = document.getElementById("messages");
 
-  function sendMessage() {
-    const input = document.getElementById("input-message");
-    const text = input.value.trim();
-    if (!text) return;
-    addMessage("User: " + text, true);
-    messages.push({ role: "user", content: text });
-    input.value = "";
-    bots.forEach(bot => tryBotRespond(bot));
-  }
-
-  function tryBotRespond(bot) {
-    const last = messages.slice(-3).map(m => m.role).join();
-    if (!last.includes(bot.role)) {
-      const systemPrompt = { role: "system", content: bot.identity };
-      const convo = [systemPrompt, ...messages];
-
-      addMessage(`${bot.name}: Typing...`, false);
-      const typingIndex = chatBox.children.length - 1;
-
-      puter.ai.chat(convo, { model: bot.model })
-        .then(res => {
-          const msg = res.message?.content || res;
-          messages.push({ role: bot.role, content: msg });
-          chatBox.children[typingIndex].textContent = `${bot.name}: ${msg}`;
-        })
-        .catch(err => {
-          chatBox.children[typingIndex].textContent = `${bot.name}: [Error: ${JSON.stringify(err)}]`;
-        });
+    function addMessage(text, isUser) {
+      const div = document.createElement("div");
+      div.className = "message";
+      div.classList.add(isUser ? "user-message" : "ai-message");
+      div.textContent = text;
+      chatBox.appendChild(div);
+      chatBox.scrollTop = chatBox.scrollHeight;
     }
-  }
 
-  document.getElementById("send-btn").onclick = sendMessage;
-  document.getElementById("input-message").addEventListener("keydown", e => {
-    if (e.key === "Enter") sendMessage();
-  });
+    function sendMessage() {
+      const input = document.getElementById("input-message");
+      const text = input.value.trim();
+      if (!text) return;
+      addMessage("User: " + text, true);
+      messages.push({ role: "user", content: text });
+      input.value = "";
+      bots.forEach(bot => tryBotRespond(bot));
+    }
 
-  // Kickoff conversation
-  bots.forEach(bot => {
-    messages.push({ role: "system", content: bot.identity });
-  });
+    function tryBotRespond(bot) {
+      const recent = messages.slice(-5).map(m => m.role);
+      const alreadyTyping = Array.from(chatBox.children).some(el =>
+        el.textContent.startsWith(`${bot.name}: Typing...`)
+      );
 
-  bots.forEach(bot => tryBotRespond(bot));
-</script></body>
+      if (alreadyTyping) return;
+
+      const respondedRecently = recent.includes("assistant");
+      if (!respondedRecently || Math.random() < 0.75) {
+        const convo = [{ role: "system", content: bot.identity }, ...messages];
+
+        const div = document.createElement("div");
+        div.className = "message ai-message";
+        div.textContent = `${bot.name}: Typing...`;
+        chatBox.appendChild(div);
+        chatBox.scrollTop = chatBox.scrollHeight;
+        const typingIndex = chatBox.children.length - 1;
+
+        puter.ai.chat(convo, { model: bot.model })
+          .then(res => {
+            const msg = res.message?.content || res;
+            messages.push({ role: "assistant", content: msg });
+            chatBox.children[typingIndex].textContent = `${bot.name}: ${msg}`;
+          })
+          .catch(err => {
+            chatBox.children[typingIndex].textContent = `${bot.name}: [Error: ${err.message || JSON.stringify(err)}]`;
+          });
+      }
+    }
+
+    document.getElementById("send-btn").onclick = sendMessage;
+    document.getElementById("input-message").addEventListener("keydown", e => {
+      if (e.key === "Enter") sendMessage();
+    });
+
+    // Kick off with first user message
+    messages.push({ role: "user", content: "Hello everyone!" });
+    addMessage("User: Hello everyone!", true);
+    bots.forEach(bot => tryBotRespond(bot));
+  </script>
+</body>
 </html>
