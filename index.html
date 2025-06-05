@@ -2,173 +2,179 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Multi-AI Group Chat</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+  <title>Multi-AI Chatroom</title>
+  <script src="https://js.puter.com/v2/"></script>
   <style>
     body {
-      font-family: monospace;
       background: #111;
       color: #eee;
-      margin: 0;
+      font-family: monospace;
       display: flex;
       flex-direction: column;
       height: 100vh;
+      margin: 0;
     }
-    #chat {
+
+    #messages {
       flex: 1;
       overflow-y: auto;
       padding: 10px;
       background: #222;
     }
+
     .message {
       margin-bottom: 8px;
+      white-space: pre-wrap;
     }
-    .ai-name {
-      font-weight: bold;
-      color: #4caf50;
-    }
-    .user-name {
-      font-weight: bold;
+
+    .user-message {
       color: #2196f3;
     }
+
+    .ai-message {
+      color: #4caf50;
+    }
+
     #input-area {
       display: flex;
       padding: 8px;
       background: #111;
       border-top: 1px solid #333;
     }
-    #message-input {
+
+    #input-message {
       flex: 1;
       padding: 10px;
       font-size: 16px;
-      border: none;
-      border-radius: 4px;
       background: #444;
       color: #eee;
+      border: none;
+      border-radius: 4px;
+      margin-right: 8px;
     }
+
     #send-btn {
       padding: 10px 16px;
       font-size: 16px;
-      border: none;
-      border-radius: 4px;
       background: #4caf50;
       color: white;
+      border: none;
+      border-radius: 4px;
       cursor: pointer;
+    }
+
+    #send-btn:hover {
+      background: #45a049;
     }
   </style>
 </head>
 <body>
 
-<div id="chat"></div>
+<div id="messages"></div>
 
 <div id="input-area">
-  <input type="text" id="message-input" placeholder="Type message..." />
+  <input id="input-message" type="text" placeholder="Say something..." />
   <button id="send-btn">Send</button>
 </div>
 
-<script src="https://js.puter.com/v2/"></script>
 <script>
-  const chat = document.getElementById('chat');
-  const input = document.getElementById('message-input');
-  const sendBtn = document.getElementById('send-btn');
-
-  const messages = [
-    {
-      role: "system",
-      content: "You are in a chat room with Claude, Gemini, and ChatGPT. You can talk to each other."
-    }
-  ];
-
+  const messages = [];
   const bots = ["ChatGPT", "Claude", "Gemini"];
-  const models = {
-    ChatGPT: "gpt-4o",
-    Claude: "claude-sonnet-4",
-    Gemini: "google/gemini-2.0-flash-lite-001"
-  };
 
-  function appendMessage(sender, text) {
-    const msgDiv = document.createElement('div');
-    msgDiv.classList.add('message');
-    const nameSpan = document.createElement('span');
-    nameSpan.textContent = sender + ": ";
-    nameSpan.classList.add(sender === "User" ? "user-name" : "ai-name");
-    msgDiv.appendChild(nameSpan);
-    msgDiv.appendChild(document.createTextNode(text));
-    chat.appendChild(msgDiv);
-    chat.scrollTop = chat.scrollHeight;
-    return msgDiv;
+  function addMessage(msg, isUser, sender = "") {
+    const messagesDiv = document.getElementById("messages");
+    const messageDiv = document.createElement("div");
+    messageDiv.classList.add("message");
+    if (isUser) {
+      messageDiv.classList.add("user-message");
+      messageDiv.textContent = `You: ${msg}`;
+    } else {
+      messageDiv.classList.add("ai-message");
+      messageDiv.textContent = `${sender}: ${msg}`;
+    }
+    messagesDiv.appendChild(messageDiv);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
   }
 
-  function getLastRealMessages(n) {
-    return Array.from(chat.querySelectorAll('.message')).slice(-n).map(el => el.textContent);
-  }
-
-  function isBotTyping(name) {
-    return getLastRealMessages(3).some(msg => msg.includes(`${name}: Typing...`));
-  }
-
-  function isSomeoneTyping() {
-    return bots.some(isBotTyping);
-  }
-
-  function sendBotResponse(botName) {
-    if (isBotTyping(botName)) return;
-
-    const recentMessages = getLastRealMessages(3).join(" ");
-    if (recentMessages.includes(botName)) return;
-    if (isSomeoneTyping()) return;
-
-    const model = models[botName];
-    const typing = appendMessage(botName, "Typing...");
-
-    puter.ai.chat(messages, { model })
-      .then(response => {
-        let content;
-
-        if (botName === 'Claude') {
-          const parts = response?.message?.content;
-          if (Array.isArray(parts)) {
-            content = parts.map(p => p?.text || "").join("").trim();
-          }
-        } else if (botName === 'Gemini') {
-          content = response.message?.content || "[No response]";
-        } else {
-          content = response.message?.content || "[No response]";
-        }
-
-        if (!content) content = "[Empty response]";
-
-        typing.textContent = `${botName}: ${content}`;
-        messages.push({ role: "assistant", name: botName, content });
-        checkAllBots();
-      })
-      .catch(err => {
-        const errorText = typeof err === 'object' && err.message ? err.message : JSON.stringify(err);
-        typing.textContent = `${botName}: [Error: ${errorText}]`;
-      });
-  }
-
-  function checkAllBots() {
-    bots.forEach(bot => sendBotResponse(bot));
-  }
-
-  function userSend() {
+  function sendMessage() {
+    const input = document.getElementById("input-message");
     const message = input.value.trim();
     if (!message) return;
 
-    appendMessage("User", message);
+    addMessage(message, true);
     messages.push({ role: "user", content: message });
-    input.value = '';
-    checkAllBots();
+    input.value = "";
+
+    bots.forEach(bot => maybeRespond(bot));
   }
 
-  sendBtn.onclick = userSend;
-  input.addEventListener('keydown', e => {
-    if (e.key === "Enter") userSend();
+  function hasTyping() {
+    return messages.slice(-3).some(m => m.content === "Typing...");
+  }
+
+  function maybeRespond(botName) {
+    if (hasTyping()) return;
+
+    addMessage("Typing...", false, botName);
+    messages.push({ role: "assistant", content: "Typing..." });
+
+    const botSystemMessage = {
+      "ChatGPT": "You are ChatGPT. You are in a group chat with Claude and Gemini. Chat with them.",
+      "Claude": "You are Claude. You are in a group chat with ChatGPT and Gemini. Chat with them.",
+      "Gemini": "You are Gemini. You are in a group chat with Claude and ChatGPT. Chat with them."
+    };
+
+    const fullPrompt = [
+      { role: "system", content: botSystemMessage[botName] },
+      ...messages.filter(m => m.content !== "Typing...")
+    ];
+
+    const model = {
+      ChatGPT: "gpt-4o",
+      Claude: "claude-sonnet-4",
+      Gemini: "google/gemini-2.0-flash-lite-001"
+    }[botName];
+
+    puter.ai.chat(fullPrompt, { model }).then(response => {
+      const content = response?.message?.content || response?.message?.content?.[0]?.text || "[No response]";
+      removeLastTyping();
+      addMessage(content, false, botName);
+      messages.push({ role: "assistant", content });
+    }).catch(error => {
+      removeLastTyping();
+      const errText = `[Error: ${JSON.stringify(error)}]`;
+      addMessage(errText, false, botName);
+      messages.push({ role: "assistant", content: errText });
+    });
+  }
+
+  function removeLastTyping() {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].content === "Typing...") {
+        messages.splice(i, 1);
+        const messagesDiv = document.getElementById("messages");
+        messagesDiv.removeChild(messagesDiv.children[i]);
+        break;
+      }
+    }
+  }
+
+  document.getElementById("send-btn").onclick = sendMessage;
+  document.getElementById("input-message").addEventListener("keydown", e => {
+    if (e.key === "Enter") sendMessage();
   });
 
-  // Initial trigger
-  bots.forEach(bot => sendBotResponse(bot));
+  // Initial intro messages to kick things off
+  bots.forEach(bot => {
+    const intro = {
+      ChatGPT: "You are ChatGPT. You are in a group chat with Claude and Gemini. Chat with them.",
+      Claude: "You are Claude. You are in a group chat with ChatGPT and Gemini. Chat with them.",
+      Gemini: "You are Gemini. You are in a group chat with Claude and ChatGPT. Chat with them."
+    }[bot];
+    messages.push({ role: "user", content: intro });
+    maybeRespond(bot);
+  });
 </script>
 
 </body>
