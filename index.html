@@ -1,162 +1,110 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-  <title>Multi-AI Chatroom</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multi-AI Chat Room</title>
   <script src="https://js.puter.com/v2/"></script>
   <style>
     body {
       background: #111;
       color: #eee;
       font-family: monospace;
+      margin: 0;
       display: flex;
       flex-direction: column;
       height: 100vh;
-      margin: 0;
     }
-
     #messages {
       flex: 1;
       overflow-y: auto;
       padding: 10px;
       background: #222;
     }
-
     .message {
       margin-bottom: 8px;
-      white-space: pre-wrap;
     }
-
     .user-message {
       color: #2196f3;
     }
-
     .ai-message {
       color: #4caf50;
     }
-
     #input-area {
       display: flex;
-      padding: 8px;
+      padding: 10px;
       background: #111;
-      border-top: 1px solid #333;
     }
-
     #input-message {
       flex: 1;
       padding: 10px;
-      font-size: 16px;
+      border: none;
+      border-radius: 4px;
       background: #444;
       color: #eee;
-      border: none;
-      border-radius: 4px;
-      margin-right: 8px;
     }
-
     #send-btn {
-      padding: 10px 16px;
-      font-size: 16px;
+      padding: 10px;
       background: #4caf50;
-      color: white;
       border: none;
       border-radius: 4px;
+      margin-left: 10px;
+      color: white;
       cursor: pointer;
-    }
-
-    #send-btn:hover {
-      background: #45a049;
     }
   </style>
 </head>
-<body>
-
-<div id="messages"></div>
-
-<div id="input-area">
-  <input id="input-message" type="text" placeholder="Say something..." />
+<body><div id="messages"></div><div id="input-area">
+  <input type="text" id="input-message" placeholder="Type your message...">
   <button id="send-btn">Send</button>
-</div>
-
-<script>
+</div><script>
   const messages = [];
-  const bots = ["ChatGPT", "Claude", "Gemini"];
 
-  function addMessage(msg, isUser, sender = "") {
-    const messagesDiv = document.getElementById("messages");
-    const messageDiv = document.createElement("div");
-    messageDiv.classList.add("message");
-    if (isUser) {
-      messageDiv.classList.add("user-message");
-      messageDiv.textContent = `You: ${msg}`;
-    } else {
-      messageDiv.classList.add("ai-message");
-      messageDiv.textContent = `${sender}: ${msg}`;
-    }
-    messagesDiv.appendChild(messageDiv);
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  const bots = [
+    { name: "ChatGPT", model: "gpt-4o", identity: "You are ChatGPT in a chatroom with Claude and Gemini." },
+    { name: "Claude", model: "anthropic/claude-3-sonnet", identity: "You are Claude in a chatroom with ChatGPT and Gemini." },
+    { name: "Gemini", model: "google/gemini-2.0-flash-lite-001", identity: "You are Gemini in a chatroom with ChatGPT and Claude." }
+  ];
+
+  const chatBox = document.getElementById("messages");
+
+  function addMessage(text, isUser) {
+    const div = document.createElement("div");
+    div.className = "message";
+    if (isUser) div.classList.add("user-message");
+    else div.classList.add("ai-message");
+    div.textContent = text;
+    chatBox.appendChild(div);
+    chatBox.scrollTop = chatBox.scrollHeight;
   }
 
   function sendMessage() {
     const input = document.getElementById("input-message");
-    const message = input.value.trim();
-    if (!message) return;
-
-    addMessage(message, true);
-    messages.push({ role: "user", content: message });
+    const text = input.value.trim();
+    if (!text) return;
+    addMessage("User: " + text, true);
+    messages.push({ role: "user", content: text });
     input.value = "";
-
-    bots.forEach(bot => maybeRespond(bot));
+    bots.forEach(bot => tryBotRespond(bot));
   }
 
-  function hasTyping() {
-    return messages.slice(-3).some(m => m.content === "Typing...");
-  }
+  function tryBotRespond(bot) {
+    const last = messages.slice(-3).map(m => m.role).join();
+    if (!last.includes(bot.name.toLowerCase())) {
+      const systemPrompt = { role: "system", content: bot.identity };
+      const convo = [systemPrompt, ...messages];
 
-  function maybeRespond(botName) {
-    if (hasTyping()) return;
+      addMessage(`${bot.name}: Typing...`, false);
+      const typingIndex = chatBox.children.length - 1;
 
-    addMessage("Typing...", false, botName);
-    messages.push({ role: "assistant", content: "Typing..." });
-
-    const botSystemMessage = {
-      "ChatGPT": "You are ChatGPT. You are in a group chat with Claude and Gemini. Chat with them.",
-      "Claude": "You are Claude. You are in a group chat with ChatGPT and Gemini. Chat with them.",
-      "Gemini": "You are Gemini. You are in a group chat with Claude and ChatGPT. Chat with them."
-    };
-
-    const fullPrompt = [
-      { role: "system", content: botSystemMessage[botName] },
-      ...messages.filter(m => m.content !== "Typing...")
-    ];
-
-    const model = {
-      ChatGPT: "gpt-4o",
-      Claude: "claude-sonnet-4",
-      Gemini: "google/gemini-2.0-flash-lite-001"
-    }[botName];
-
-    puter.ai.chat(fullPrompt, { model }).then(response => {
-      const content = response?.message?.content || response?.message?.content?.[0]?.text || "[No response]";
-      removeLastTyping();
-      addMessage(content, false, botName);
-      messages.push({ role: "assistant", content });
-    }).catch(error => {
-      removeLastTyping();
-      const errText = `[Error: ${JSON.stringify(error)}]`;
-      addMessage(errText, false, botName);
-      messages.push({ role: "assistant", content: errText });
-    });
-  }
-
-  function removeLastTyping() {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].content === "Typing...") {
-        messages.splice(i, 1);
-        const messagesDiv = document.getElementById("messages");
-        messagesDiv.removeChild(messagesDiv.children[i]);
-        break;
-      }
+      puter.ai.chat(convo, { model: bot.model })
+        .then(res => {
+          const msg = res.message?.content || res;
+          messages.push({ role: bot.name.toLowerCase(), content: msg });
+          chatBox.children[typingIndex].textContent = `${bot.name}: ${msg}`;
+        })
+        .catch(err => {
+          chatBox.children[typingIndex].textContent = `${bot.name}: [Error: ${JSON.stringify(err)}]`;
+        });
     }
   }
 
@@ -165,17 +113,11 @@
     if (e.key === "Enter") sendMessage();
   });
 
-  // Initial intro messages to kick things off
+  // Kickoff conversation
   bots.forEach(bot => {
-    const intro = {
-      ChatGPT: "You are ChatGPT. You are in a group chat with Claude and Gemini. Chat with them.",
-      Claude: "You are Claude. You are in a group chat with ChatGPT and Gemini. Chat with them.",
-      Gemini: "You are Gemini. You are in a group chat with Claude and ChatGPT. Chat with them."
-    }[bot];
-    messages.push({ role: "user", content: intro });
-    maybeRespond(bot);
+    messages.push({ role: bot.name.toLowerCase(), content: bot.identity });
   });
-</script>
 
-</body>
+  bots.forEach(bot => tryBotRespond(bot));
+</script></body>
 </html>
