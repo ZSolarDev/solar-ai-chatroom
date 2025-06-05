@@ -86,8 +86,6 @@
     Gemini: "google/gemini-2.0-flash-lite-001"
   };
 
-  const typingStatus = {};
-
   function appendMessage(sender, text) {
     const msgDiv = document.createElement('div');
     msgDiv.classList.add('message');
@@ -117,30 +115,36 @@
     if (isBotTyping(botName)) return;
 
     const recentMessages = getLastRealMessages(3).join(" ");
-    if (recentMessages.includes(botName)) return; // already spoke recently
+    if (recentMessages.includes(botName)) return;
     if (isSomeoneTyping()) return;
 
     const model = models[botName];
     const typing = appendMessage(botName, "Typing...");
-    typingStatus[botName] = typing;
 
     puter.ai.chat(messages, { model })
       .then(response => {
         let content;
+
         if (botName === 'Claude') {
-          content = response.message.content?.[0]?.text || "[No response]";
+          const parts = response?.message?.content;
+          if (Array.isArray(parts)) {
+            content = parts.map(p => p?.text || "").join("").trim();
+          }
         } else if (botName === 'Gemini') {
-          content = response.message.content || "[No response]";
+          content = response.message?.content || "[No response]";
         } else {
-          content = response.message.content || "[No response]";
+          content = response.message?.content || "[No response]";
         }
+
+        if (!content) content = "[Empty response]";
 
         typing.textContent = `${botName}: ${content}`;
         messages.push({ role: "assistant", name: botName, content });
-        checkAllBots(); // recursive turn taking
+        checkAllBots();
       })
       .catch(err => {
-        typing.textContent = `${botName}: [Error: ${err.message || err}]`;
+        const errorText = typeof err === 'object' && err.message ? err.message : JSON.stringify(err);
+        typing.textContent = `${botName}: [Error: ${errorText}]`;
       });
   }
 
@@ -155,7 +159,6 @@
     appendMessage("User", message);
     messages.push({ role: "user", content: message });
     input.value = '';
-
     checkAllBots();
   }
 
@@ -164,7 +167,7 @@
     if (e.key === "Enter") userSend();
   });
 
-  // Kickstart chat
+  // Initial trigger
   bots.forEach(bot => sendBotResponse(bot));
 </script>
 
